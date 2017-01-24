@@ -1,6 +1,7 @@
 import ops
 
 import numpy as np
+import math
 
 
 #------------------------------------------------------------------------------
@@ -33,6 +34,43 @@ class EvaluationResults:
 
     def clear(self):
         self.X = []
+
+
+
+#------------------------------------------------------------------------------
+
+
+class TrainingParameters(object):
+
+    def __init__(self):
+        self.batch_size = 10
+        self.regularisation = 0.0
+        self.learning_rate = 1
+        
+        self.cost_threshold = 1e-3
+        self.cost_abort_threshold = 1e-5
+        self.max_iterations = 2000
+        self.report_cost_iteration_count = 200
+
+
+#------------------------------------------------------------------------------
+
+
+class TrainingReport(object):
+
+    def __init__(self):
+        self.iterations = 0
+        self.cost_history = np.array([], dtype=np.float32)
+        self.status = ""
+
+    def __str__(self):
+
+        final_cost = None
+        if self.cost_history.size > 0:
+            final_cost = self.cost_history[-1]
+
+        return ('{0}\nTotal iterations: {1}\n' +
+                'Final cost: {2}').format(self.status, self.iterations, final_cost)
 
 
 #------------------------------------------------------------------------------
@@ -76,9 +114,16 @@ class NeuralNet(object):
         for layer_index, layer in enumerate( self._layers ):
 
             # Columns of our weight matrix relate to inputs, rows are our outputs
-            W_shape = [layer.size, self.numInputs(layer_index)+1]
+            num_inputs = self.numInputs(layer_index)
+            W_shape = [layer.size, num_inputs+1]
 
-            self._W.append( np.random.random(W_shape) )
+            # Weights must be normalized with respect to the number of inputs
+            # Otherwise we easily end up saturating sigmoid functions
+            # See http://stats.stackexchange.com/questions/47590/what-are-good-initial-weights-in-a-neural-network
+            
+            weight_normalization = 2.0/math.sqrt(num_inputs)
+
+            self._W.append( weight_normalization*( np.random.random(W_shape)-0.5 ) )
 
 
     def printWeights(self):
@@ -99,7 +144,7 @@ class NeuralNet(object):
         y = x
         for layer_index, layer in enumerate(self._layers):
             y = layer.op.evaluate( y, self._W[layer_index] )
-
+            
             # Cache intermediate results. We need these for efficient backprop
             results.X.append(y)
         
@@ -152,7 +197,7 @@ class NeuralNet(object):
         return dE_dy
 
 
-    def train(self, X, T, regularisation, learning_rate):
+    def updateWeights(self, X, T, regularisation, learning_rate):
         results = EvaluationResults()
 
         # Number of training examples
@@ -180,6 +225,51 @@ class NeuralNet(object):
             W -= learning_rate * dW[layer_index]
 
 
+    def miniBatchTraining(self, X, T, params):
+
+        report = TrainingReport()
+
+        num_examples = X.shape[0]
+
+        cost_history = []
+
+        prev_cost = float('inf')
+        iterations = 0
+        while iterations < params.max_iterations:
+
+            Y = self.evaluateBatch(X)
+
+            cost = self.calculateCost( T, Y, params.regularisation )
+            cost_history.append( cost )
+
+            if iterations % params.report_cost_iteration_count == 0:
+                print "{0}: Cost {1}".format(iterations, cost)
+
+            # Are we done?
+            if cost < params.cost_threshold:
+                report.status = "Completed"
+                break
+
+            # Should we give up
+            if iterations > 0 and abs(cost - prev_cost) < params.cost_abort_threshold:
+                report.status = "Aborting. Cost has converged"
+                break
+
+            prev_cost = cost
+            iterations = iterations + 1
+
+            # Perform training on batches of examples
+            for k in xrange(0, num_examples, params.batch_size):
+                kk = min(num_examples, k+params.batch_size)
+                self.updateWeights( X[k:kk], T[k:kk], params.regularisation, params.learning_rate)
+
+        if iterations == params.max_iterations:
+             report.status = "Aborting. Maximum iterations reached"
+
+        report.iterations = iterations
+        report.cost_history = np.array(cost_history)
+
+        return report
     
 
 

@@ -29,3 +29,7 @@ def plotCost(samples, max_samples):
 	plt.plot(X, Y)
 
 	plt.show()
+
+
+def plotReport(report):
+	plotCost( report.cost_history, 500)

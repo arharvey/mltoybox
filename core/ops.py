@@ -69,6 +69,35 @@ class LinearOp(Op):
         return (dE_dx, dE_dw)
 
 
+class ReLUOp(Op):
+    '''Rectified linear unit'''
+
+    def evaluate(self, x, W):
+        # First column of weights are the bias values
+        x_with_bias = np.hstack([1.0, x])
+        z = np.dot( W, x_with_bias )
+        y = z * (z > 0.0)
+
+        return y
+
+
+    def backprop(self, x, y, W, dE_dy):
+        
+        dy_dz = (y > 0.0).astype(float)
+        dE_dz = np.multiply(dy_dz, dE_dy)
+
+        # dE_dx
+        dE_dx = np.dot(W.T, dE_dz) 
+        
+        # dE_dw
+        x_with_bias = np.hstack([1.0, x]) # x_bias is hardcoded to 1.0
+
+        dz_dw = np.tile( x_with_bias, (W.shape[0],1) )
+        dE_dw = np.multiply( dz_dw, dE_dz.reshape(-1,1) )
+
+        return (dE_dx, dE_dw)
+
+
 class SigmoidOp(Op):
 
     def evaluate(self, x, W):

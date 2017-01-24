@@ -41,6 +41,34 @@ def testLinearOp():
 
 #------------------------------------------------------------------------------
 
+def testReLUOp():
+
+    # Two inputs
+    x = np.array( [2.0,3.0] )
+
+    # Weights for two neurons. First weight is for bias
+    W = np.array( [ [1.0,-2.0,-3.0],
+                    [2.0, 4.0, 8.0] ] )
+
+    # Number of neurons is implied by the number of rows in the weight matrix
+    lin_op = ops.ReLUOp()
+
+    y = lin_op.evaluate( x, W )
+
+    #assert( (y == np.array([321., 34.0])).all() )
+
+
+    # Differentiate
+
+    print 'dy_dw (fd) =', ops.differentiateByFiniteDifference(lin_op, x, W, h)
+    
+    dy_dx, dy_dw = lin_op.backprop( x, y, W, np.ones(W.shape[0]) )
+    print 'dy_dx =', dy_dx
+    print 'dy_dw =', dy_dw
+
+
+#------------------------------------------------------------------------------
+
 def testSigmoidOp():
 
     # Plot output of a single neuron 
@@ -103,62 +131,19 @@ def testSingleNeuron():
 
     net.initWeights(random_weights_seed)
 
-    net.printWeights()
-
     X = np.vstack( (X0, X1 ) )
     T = np.vstack( (np.zeros(X0.shape[0]).reshape(-1,1), 
                     np.ones(X1.shape[0]).reshape(-1,1) ) )
 
-    print 'X = \n{0}'.format(X)
-    print 'T = \n{0}'.format(T)
+    params = nn.TrainingParameters()
+    params.learning_rate = 4
+    params.batch_size = 2
 
-    learning_rate = 4
-    regularisation = 0.0
-
-    cost_threshold = 1e-3
-    cost_abort_threshold = 1e-8
-    max_iterations = 2000
-    report_cost_iteration_count = 200
-
-    cost_history = []
-
-    prev_cost = float('inf')
-    iterations = 0
-    while iterations < max_iterations:
-
-        Y = net.evaluateBatch(X)
-        #print 'Y = \n{0}'.format(Y)
-
-        cost = net.calculateCost( T, Y, regularisation )
-        cost_history.append( cost )
-
-        if iterations % report_cost_iteration_count == 0:
-            print "{0}: Cost {1}".format(iterations, cost)
-
-        # Are we done?
-        if cost < cost_threshold:
-            print "Completed"
-            break
-
-        # Should we give up
-        if iterations > 0 and abs(cost - prev_cost) < cost_abort_threshold:
-            print "Aborting. Cost has converged"
-            break
-
-        prev_cost = cost
-        iterations = iterations + 1
-
-        # Perform a round of training
-        net.train( X, T, regularisation, learning_rate)
-
-    if iterations == max_iterations:
-        print "Aborting. Maximum iterations reached"
-
-    print 'Total iterations:', iterations
-    print 'Final cost:', cost
+    report = net.miniBatchTraining(X, T, params)
+    print report
+    
     net.printWeights()
-
-    vis.plotCost( np.array(cost_history), 500)
+    vis.plotReport(report)
 
 
 
@@ -167,7 +152,8 @@ def testSingleNeuron():
 def main():
     #testLinearOp()
     #testSigmoidOp()
-    testSingleNeuron()
+    testReLUOp()
+    #testSingleNeuron()
 
 if __name__ == "__main__":
     main()
