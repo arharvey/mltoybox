@@ -70,7 +70,7 @@ class TrainingReport(object):
             final_cost = self.cost_history[-1]
 
         return ('{0}\nTotal iterations: {1}\n' +
-                'Final cost: {2}').format(self.status, self.iterations, final_cost)
+                'Training cost: {2}').format(self.status, self.iterations, final_cost)
 
 
 #------------------------------------------------------------------------------
@@ -270,6 +270,15 @@ class NeuralNet(object):
         report.cost_history = np.array(cost_history)
 
         return report
+    
+
+#------------------------------------------------------------------------------
+
+def countHits(T,Y):
+    hits = np.sum( np.argmax(T, axis=1) == np.argmax(Y, axis=1) )
+    total = T.shape[0]
+
+    return (hits, total)
     
 
 

@@ -13,6 +13,7 @@ import numpy as np
 import core.neural_net as nn
 import core.vis as vis
 import core.ops as ops
+import core.dataset_utils as dataset_utils
 
 #------------------------------------------------------------------------------
 
@@ -60,11 +61,26 @@ def main():
     
     print "Found", num_training, 'training examples'
 
-    num_display = 80
-
-    rnd_indices = np.array( np.random.rand(num_display) * num_training, dtype=np.int)
-
+    #num_display = 80
+    #rnd_indices = np.array( np.random.rand(num_display) * num_training, dtype=np.int)
     #displayImages(training_images[rnd_indices], dims)
+    
+    # Split training set into training and cross-validation sets
+
+    random_dataset_seed = 0xa85ca2c9
+
+    training_subset = 4000
+    cv_fraction = 0.25
+
+    training_images, training_labels, cv_images, cv_labels = \
+        dataset_utils.splitTrainingData(training_images, training_labels,
+                                        cv_fraction, training_subset,
+                                        random_dataset_seed)
+
+    num_training = training_images.shape[0]
+    num_cv = cv_images.shape[0]
+
+    print 'Splitting training/cross-validation examples: {0}/{1}'.format(num_training, num_cv)
 
     num_inputs = training_images.shape[1]
     num_outputs = training_labels.shape[1]
@@ -73,26 +89,43 @@ def main():
 
     net = nn.NeuralNet(num_inputs)
 
-    net.addLayer( nn.Layer(ops.ReLUOp(), num_inputs) )
-    #net.addLayer( nn.Layer(ops.ReLUOp(), num_inputs) )
+    net.addLayer( nn.Layer(ops.ReLUOp(), 100) )
+    #net.addLayer( nn.Layer(ops.ReLUOp(), 100) )
     net.addLayer( nn.Layer(ops.SigmoidOp(), num_outputs) )
 
     net.initWeights(random_weights_seed)
 
     params = nn.TrainingParameters()
-    params.learning_rate = 1.0
-    params.regularisation = 0.0
+    params.learning_rate = 0.5
+    params.regularisation = 0.005
     params.batch_size = 10
-    params.report_cost_iteration_count = 1
+    params.report_cost_iteration_count = 10
+    params.max_iterations = 200
 
-    sel = np.array( np.random.rand(100) * num_training, dtype=np.int)
-
-
-    report = net.miniBatchTraining(training_images[sel], training_labels[sel], params)
-    print report
+    report = net.miniBatchTraining(training_images, training_labels, params)
     
-    net.printWeights()
-    vis.plotReport(report)
+    print report
+
+    # Calculate validation cost
+
+    cv_Y = net.evaluateBatch(cv_images)
+    cv_cost = net.calculateCost(cv_labels, cv_Y, params.regularisation)
+
+    print 'Cross-validation cost:', cv_cost
+
+    # Calculate cost of test set
+    test_images = dataset['test']['images']
+    test_labels = dataset['test']['labels']
+
+    test_Y = net.evaluateBatch(test_images)
+    test_cost = net.calculateCost(test_labels, test_Y, params.regularisation)
+
+    print 'Test cost:',test_cost
+
+    hits, num_test = nn.countHits(test_labels, test_Y)
+    print 'Hit rate:', float(hits)/num_test
+
+    #vis.plotReport(report)
 
 if __name__ == "__main__":
     main()
