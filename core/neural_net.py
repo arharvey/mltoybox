@@ -2,6 +2,15 @@ import ops
 
 import numpy as np
 import math
+import thread
+
+
+import thread
+
+def input_thread(list):
+    raw_input()
+    list.append(None)
+    print 'Aborting...'
 
 
 #------------------------------------------------------------------------------
@@ -48,7 +57,7 @@ class TrainingParameters(object):
         self.learning_rate = 1
         
         self.cost_threshold = 1e-3
-        self.cost_abort_threshold = 1e-5
+        self.cost_abort_threshold = 1e-8
         self.max_iterations = 2000
         self.report_cost_iteration_count = 200
 
@@ -115,15 +124,19 @@ class NeuralNet(object):
 
             # Columns of our weight matrix relate to inputs, rows are our outputs
             num_inputs = self.numInputs(layer_index)
-            W_shape = [layer.size, num_inputs+1]
+            W_shape = [layer.size, num_inputs]
 
             # Weights must be normalized with respect to the number of inputs
             # Otherwise we easily end up saturating sigmoid functions
             # See http://stats.stackexchange.com/questions/47590/what-are-good-initial-weights-in-a-neural-network
-            
-            weight_normalization = 2.0/math.sqrt(num_inputs)
+            # Bias weights are set to zero
 
-            self._W.append( weight_normalization*( np.random.random(W_shape)-0.5 ) )
+            weight_normalization = 1.0/math.sqrt(num_inputs)
+
+            rand_weights =  weight_normalization*( np.random.normal(size=W_shape) )
+
+            self._W.append( np.hstack( [np.zeros([layer.size,1]), rand_weights] ) )
+
 
 
     def printWeights(self):
@@ -227,6 +240,10 @@ class NeuralNet(object):
 
     def miniBatchTraining(self, X, T, params):
 
+        # Allow us to safely exit
+        abort_signal = []
+        #thread.start_new_thread(input_thread, (abort_signal,))
+
         report = TrainingReport()
 
         num_examples = X.shape[0]
@@ -237,6 +254,7 @@ class NeuralNet(object):
         iterations = 0
         while iterations < params.max_iterations:
 
+
             Y = self.evaluateBatch(X)
 
             cost = self.calculateCost( T, Y, params.regularisation )
@@ -244,6 +262,11 @@ class NeuralNet(object):
 
             if iterations % params.report_cost_iteration_count == 0:
                 print "{0}: Cost {1}".format(iterations, cost)
+
+            # Has the user requested us to abort?
+            if abort_signal:
+                report.status = "Aborted"
+                break
 
             # Are we done?
             if cost < params.cost_threshold:
@@ -263,6 +286,7 @@ class NeuralNet(object):
                 kk = min(num_examples, k+params.batch_size)
                 self.updateWeights( X[k:kk], T[k:kk], params.regularisation, params.learning_rate)
 
+        
         if iterations == params.max_iterations:
              report.status = "Aborting. Maximum iterations reached"
 
@@ -279,7 +303,7 @@ def countHits(T,Y):
     total = T.shape[0]
 
     return (hits, total)
-    
+
 
 
 

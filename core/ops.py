@@ -75,6 +75,7 @@ class ReLUOp(Op):
     def evaluate(self, x, W):
         # First column of weights are the bias values
         x_with_bias = np.hstack([1.0, x])
+
         z = np.dot( W, x_with_bias )
         y = z * (z > 0.0)
 

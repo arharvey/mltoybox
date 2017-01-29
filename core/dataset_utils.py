@@ -22,5 +22,5 @@ def splitTrainingData(X, Y, cv_fraction, subset, seed):
     training_X = X[ sel[:k] ]
     training_Y = Y[ sel[:k] ]
 
-    return (training_X, training_Y, cv_X, cv_Y)
+    return ((training_X, training_Y), (cv_X, cv_Y))
 

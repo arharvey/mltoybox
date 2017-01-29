@@ -16,17 +16,18 @@ def plotCost(samples, max_samples):
 		Y = np.zeros( max_samples )
 
 		step = float(num_samples) / max_samples
-		for j in xrange(max_samples):
+		for j in xrange(1, max_samples):
 			i = int(j * step)
 
 			X[j] = float(i)
 			Y[j] = samples[i]
 
 	else:
-		X = np.arange( num_samples )
-		Y = samples
+		X = np.arange( 1, num_samples )
+		Y = samples[1:]
 
 	plt.plot(X, Y)
+	plt.axis([1, X[-1], 0.0, np.max(Y)])
 
 	plt.show()
 

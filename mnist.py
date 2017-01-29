@@ -14,6 +14,7 @@ import core.neural_net as nn
 import core.vis as vis
 import core.ops as ops
 import core.dataset_utils as dataset_utils
+import core.wedge as wedge
 
 #------------------------------------------------------------------------------
 
@@ -49,6 +50,42 @@ def displayImages(images, dim):
 
 #------------------------------------------------------------------------------
 
+
+def logrange(start, stop, steps):
+
+    ratio = stop/start
+    base = ratio ** 1.0/steps
+
+    return np.logspace(0.0, math.log(ratio)/math.log(base), steps, base = base) * start
+
+
+
+def create_params(v):
+    params = nn.TrainingParameters()
+    params.learning_rate = 1
+    params.regularisation = 0.0025
+    params.batch_size = 10
+    params.report_cost_iteration_count = 10
+    params.max_iterations = 100
+
+    return params
+
+
+def create_network(num_inputs, num_outputs, v):
+
+    net = nn.NeuralNet(num_inputs)
+
+    net.addLayer( nn.Layer(ops.ReLUOp(), 280) )
+    net.addLayer( nn.Layer(ops.ReLUOp(), v) )
+    #net.addLayer( nn.Layer(ops.ReLUOp(), 100) )
+    net.addLayer( nn.Layer(ops.SigmoidOp(), num_outputs) )
+
+    random_weights_seed = 0xab5a32c0
+    net.initWeights(random_weights_seed)
+
+    return net
+
+
 def main():
     print "Loading training data..."
     dataset = training_data.load()
@@ -69,61 +106,35 @@ def main():
 
     random_dataset_seed = 0xa85ca2c9
 
-    training_subset = 4000
+    training_subset = 20000
     cv_fraction = 0.25
 
-    training_images, training_labels, cv_images, cv_labels = \
-        dataset_utils.splitTrainingData(training_images, training_labels,
+    training, cv = dataset_utils.splitTrainingData(training_images, training_labels,
                                         cv_fraction, training_subset,
                                         random_dataset_seed)
 
-    num_training = training_images.shape[0]
-    num_cv = cv_images.shape[0]
+    num_training = training[0].shape[0]
+    num_cv = cv[0].shape[0]
 
     print 'Splitting training/cross-validation examples: {0}/{1}'.format(num_training, num_cv)
 
-    num_inputs = training_images.shape[1]
-    num_outputs = training_labels.shape[1]
+    num_inputs = training[0].shape[1]
+    num_outputs = training[1].shape[1]
 
-    random_weights_seed = 0xab5a32c0
+    test = ( dataset['test']['images'], dataset['test']['labels'] )
 
-    net = nn.NeuralNet(num_inputs)
+    # Wedge hyper parameters
 
-    net.addLayer( nn.Layer(ops.ReLUOp(), 100) )
-    #net.addLayer( nn.Layer(ops.ReLUOp(), 100) )
-    net.addLayer( nn.Layer(ops.SigmoidOp(), num_outputs) )
+    print
 
-    net.initWeights(random_weights_seed)
+    wedge_values = logrange(20, 400, 10).astype(int)
+    print wedge_values
 
-    params = nn.TrainingParameters()
-    params.learning_rate = 0.5
-    params.regularisation = 0.005
-    params.batch_size = 10
-    params.report_cost_iteration_count = 10
-    params.max_iterations = 200
+    wedge.wedge( lambda v: create_network(num_inputs, num_outputs, v),
+                 create_params,
+                 wedge_values,
+                 training, cv, test )
 
-    report = net.miniBatchTraining(training_images, training_labels, params)
-    
-    print report
-
-    # Calculate validation cost
-
-    cv_Y = net.evaluateBatch(cv_images)
-    cv_cost = net.calculateCost(cv_labels, cv_Y, params.regularisation)
-
-    print 'Cross-validation cost:', cv_cost
-
-    # Calculate cost of test set
-    test_images = dataset['test']['images']
-    test_labels = dataset['test']['labels']
-
-    test_Y = net.evaluateBatch(test_images)
-    test_cost = net.calculateCost(test_labels, test_Y, params.regularisation)
-
-    print 'Test cost:',test_cost
-
-    hits, num_test = nn.countHits(test_labels, test_Y)
-    print 'Hit rate:', float(hits)/num_test
 
     #vis.plotReport(report)
 
